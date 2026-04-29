@@ -1,0 +1,40 @@
+# Environment variables (local, never commit)
+.env
+.env.local
+.env.*.local
+
+# Node modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test outputs
+screenshots/
+reports/
+*.log
+
+# Build outputs
+dist/
+build/
+
+# Playwright browsers
+/ms-playwright/
+/.cache
+.playwright-mcp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+#Arquivos
+screenshots/
+documentos/QUICKSTART.md
+documentos/README.md
