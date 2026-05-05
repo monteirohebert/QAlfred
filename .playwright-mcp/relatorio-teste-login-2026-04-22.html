@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Teste - Login</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 30px; text-align: center; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 30px; background: #f8f9fa; }
+        .summary-card { background: white; padding: 20px; border-radius: 6px; border-left: 4px solid #667eea; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
+        .summary-card.success { border-left-color: #10b981; }
+        .summary-card h3 { font-size: 1.2em; color: #666; margin-bottom: 8px; }
+        .summary-card .value { font-size: 2.5em; font-weight: bold; color: #667eea; }
+        .summary-card.success .value { color: #10b981; }
+        .content { padding: 30px; }
+        .test-info { margin-bottom: 30px; padding: 20px; background: #f3f4f6; border-radius: 6px; }
+        .test-info h2 { font-size: 1.3em; margin-bottom: 15px; }
+        .info-row { display: grid; grid-template-columns: 150px 1fr; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }
+        .info-label { font-weight: 600; color: #667eea; }
+        .info-value { color: #4b5563; }
+        .steps-section { margin-top: 40px; }
+        .steps-section h2 { font-size: 1.8em; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 3px solid #667eea; }
+        .step { margin-bottom: 30px; border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden; background: white; }
+        .step-header { display: flex; align-items: center; gap: 15px; padding: 20px; background: #f9fafb; border-bottom: 1px solid #e5e7eb; }
+        .step-status { font-size: 2em; }
+        .step-title { flex: 1; font-weight: 600; font-size: 1.1em; }
+        .step-number { background: #667eea; color: white; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        .step-content { padding: 20px; }
+        .step-result { background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; border-radius: 4px; margin-bottom: 15px; }
+        .conclusion { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; border-radius: 6px; margin-top: 30px; text-align: center; }
+        .footer { padding: 20px 30px; background: #f9fafb; border-top: 1px solid #e5e7eb; text-align: center; color: #999; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Relatório de Teste - Login</h1>
+            <p>Execução de Cenários Gherkin com Playwright</p>
+        </div>
+        
+        <div class="summary">
+            <div class="summary-card success">
+                <h3>Aprovados</h3>
+                <div class="value">5</div>
+            </div>
+            <div class="summary-card">
+                <h3>Falhados</h3>
+                <div class="value">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Bloqueados</h3>
+                <div class="value">0</div>
+            </div>
+            <div class="summary-card">
+                <h3>Taxa de Sucesso</h3>
+                <div class="value">100%</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            <div class="test-info">
+                <h2>Informações do Teste</h2>
+                <div class="info-row">
+                    <div class="info-label">Data:</div>
+                    <div class="info-value">22 de abril de 2026</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Hora:</div>
+                    <div class="info-value">19:20:30</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Cenário:</div>
+                    <div class="info-value">Realizar login na aplicação web Exeplo</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">URL Testada:</div>
+                    <div class="info-value">https://www.saucedemo.com/</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Ferramenta:</div>
+                    <div class="info-value">Playwright + QAlfred</div>
+                </div>
+            </div>
+            
+            <div class="steps-section">
+                <h2>Execução dos Passos</h2>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <div class="step-title">Dado que acesso a url "APP_LOGIN_URL"</div>
+                        <span class="step-status">✅</span>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-result">
+                            <strong>Resultado:</strong> Página de login carregada com sucesso
+                        </div>
+                        <p><strong>Screenshot:</strong> login-passo1-pagina-inicial-2026-04-22_19-20-30.png</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <div class="step-title">Quando insiro um nome de usuário "standard_user" no campo "Username"</div>
+                        <span class="step-status">✅</span>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-result">
+                            <strong>Resultado:</strong> Campo preenchido com "standard_user" com sucesso
+                        </div>
+                        <p><strong>Screenshot:</strong> login-passo2-username-preenchido-2026-04-22_19-20-31.png</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">3</div>
+                        <div class="step-title">E senha "secret_sauce"</div>
+                        <span class="step-status">✅</span>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-result">
+                            <strong>Resultado:</strong> Campo de password preenchido com "secret_sauce" com sucesso
+                        </div>
+                        <p><strong>Screenshot:</strong> login-passo3-senha-preenchida-2026-04-22_19-20-32.png</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">4</div>
+                        <div class="step-title">E clicar no botão "Login"</div>
+                        <span class="step-status">✅</span>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-result">
+                            <strong>Resultado:</strong> Botão clicado com sucesso
+                        </div>
+                        <p><strong>Screenshot:</strong> login-passo4-login-clicado-2026-04-22_19-20-33.png</p>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div class="step-header">
+                        <div class="step-number">5</div>
+                        <div class="step-title">Então devo ser redirecionado para a página inicial</div>
+                        <span class="step-status">✅</span>
+                    </div>
+                    <div class="step-content">
+                        <div class="step-result">
+                            <strong>Resultado:</strong> Login bem-sucedido! Redirecionado para https://www.saucedemo.com/inventory.html com sucesso
+                        </div>
+                        <p><strong>Verificações Realizadas:</strong></p>
+                        <ul style="margin-left: 20px; margin-top: 8px;">
+                            <li>URL mudou corretamente</li>
+                            <li>Página de produtos carregada</li>
+                            <li>6 itens encontrados na página</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="conclusion">
+                <h3>Conclusão</h3>
+                <p>O teste de login foi 100% bem-sucedido. O usuário standard_user conseguiu fazer login com a senha secret_sauce e foi corretamente redirecionado para a página inicial de produtos da aplicação Swag Labs.</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Relatório gerado em 22 de abril de 2026 às 19:20:30 - QAlfred Test Automation Platform</p>
+        </div>
+    </div>
+</body>
+</html>
