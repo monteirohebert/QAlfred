@@ -1,0 +1,78 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - heading "📋 Relatório de Teste - Login" [level=1] [ref=e4]
+    - paragraph [ref=e5]: Execução de Cenários Gherkin com Playwright
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - heading "✅ Aprovados" [level=3] [ref=e8]
+      - generic [ref=e9]: "5"
+    - generic [ref=e10]:
+      - heading "❌ Falhados" [level=3] [ref=e11]
+      - generic [ref=e12]: "0"
+    - generic [ref=e13]:
+      - heading "⚠️ Bloqueados" [level=3] [ref=e14]
+      - generic [ref=e15]: "0"
+    - generic [ref=e16]:
+      - heading "📊 Taxa de Sucesso" [level=3] [ref=e17]
+      - generic [ref=e18]: 100%
+  - generic [ref=e19]:
+    - generic [ref=e20]:
+      - heading "Informações do Teste" [level=2] [ref=e21]
+      - generic [ref=e22]:
+        - generic [ref=e23]: "Data:"
+        - generic [ref=e24]: 22 de abril de 2026
+      - generic [ref=e25]:
+        - generic [ref=e26]: "Hora:"
+        - generic [ref=e27]: 19:20:30
+      - generic [ref=e28]:
+        - generic [ref=e29]: "Cenário:"
+        - generic [ref=e30]: Realizando login na aplicação web Exeplo
+      - generic [ref=e31]:
+        - generic [ref=e32]: "URL:"
+        - generic [ref=e33]: https://www.saucedemo.com/
+    - generic [ref=e34]:
+      - heading "Execução dos Passos" [level=2] [ref=e35]
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - generic [ref=e38]: "1"
+          - generic [ref=e39]: Dado que acesso a url "APP_LOGIN_URL"
+          - generic [ref=e40]: ✅
+        - generic [ref=e42]:
+          - strong [ref=e43]: "Resultado:"
+          - text: Página de login carregada com sucesso
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - generic [ref=e46]: "2"
+          - generic [ref=e47]: Quando insiro um nome de usuário "standard_user" no campo "Username"
+          - generic [ref=e48]: ✅
+        - generic [ref=e50]:
+          - strong [ref=e51]: "Resultado:"
+          - text: Campo preenchido com "standard_user" com sucesso
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - generic [ref=e54]: "3"
+          - generic [ref=e55]: E senha "secret_sauce"
+          - generic [ref=e56]: ✅
+        - generic [ref=e58]:
+          - strong [ref=e59]: "Resultado:"
+          - text: Campo de password preenchido com "secret_sauce"
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - generic [ref=e62]: "4"
+          - generic [ref=e63]: E clicar no botão "Login"
+          - generic [ref=e64]: ✅
+        - generic [ref=e66]:
+          - strong [ref=e67]: "Resultado:"
+          - text: Botão clicado com sucesso
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - generic [ref=e70]: "5"
+          - generic [ref=e71]: Então devo ser redirecionado para a página inicial
+          - generic [ref=e72]: ✅
+        - generic [ref=e74]:
+          - strong [ref=e75]: "Resultado:"
+          - text: Login bem-sucedido! Redirecionado para https://www.saucedemo.com/inventory.html
+    - generic [ref=e76]:
+      - heading "✨ Conclusão" [level=3] [ref=e77]
+      - paragraph [ref=e78]: O teste de login foi 100% bem-sucedido. O usuário standard_user conseguiu fazer login e foi redirecionado para a página inicial de produtos.
+  - paragraph [ref=e80]: Relatório gerado em 22 de abril de 2026 às 19:20:30 - QAlfred Test Automation Platform
