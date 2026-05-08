@@ -1,318 +1,219 @@
-# 🚀 QAlfred - End-to-End Test Automation
+# QAlfred — End-to-End Test Framework
 
-**QAlfred** é um framework automático de testes E2E que combina a especificação **Gherkin/BDD** com a automação **Playwright**. Executado por dois agentes coordenados:
-
-- **QAlfred**: Executa os testes e gera relatórios
+**QAlfred** é um framework de automação de testes end-to-end construído sobre [Playwright](https://playwright.dev) e o paradigma BDD com especificações em Gherkin. O projeto adota uma arquitetura orientada a agentes para separar as responsabilidades de design de cenários, execução de testes, auditoria de acessibilidade e geração de relatórios.
 
 ---
 
-## 📋 Pré-requisitos
+## Arquitetura
 
-- **Node.js** v18+ ([Download](https://nodejs.org))
-- **npm** (vem com Node.js)
-- **VS Code** (recomendado)
+O framework é composto por quatro camadas:
+
+| Camada | Responsabilidade |
+|--------|-----------------|
+| **Agente QAlfred** | Orquestra a execução dos testes e coordena as skills |
+| **Test Case Designer** | Gera cenários Gherkin estruturados a partir de descrições funcionais |
+| **Accessibility Tester** | Realiza auditorias WCAG 2.1 nos fluxos testados |
+| **PDF Reporter** | Consolida os resultados em relatórios HTML e PDF |
+
+O motor de execução (`src/runner.js`) interpreta arquivos `.feature`, lança o navegador via Playwright, executa cada passo sequencialmente com suporte a palavras-chave em português e inglês, captura evidências visuais e alimenta o gerador de relatórios (`src/reporter.js`).
 
 ---
 
-## 🔧 Instalação Rápida (2 minutos)
+## Pré-requisitos
 
-### 1. **Instalar Dependências**
+- Node.js v18 ou superior
+- npm (distribuído com o Node.js)
+
+---
+
+## Instalação
+
+### 1. Instalar dependências
 
 ```bash
 npm install
 ```
 
-Isso instala:
-- ✅ Playwright (automação de browser)
-- ✅ Gherkin parser (lê arquivos `.feature`)
-- ✅ dotenv (carrega variáveis de ambiente)
+Serão instalados:
 
-### 2. **Configurar Variáveis de Ambiente**
+- `playwright` — automação de navegador
+- `@cucumber/gherkin` — parser de arquivos `.feature`
+- `dotenv` — gerenciamento de variáveis de ambiente
 
-```bash
-# Copiar arquivo de exemplo
-cp .env.example .env
+### 2. Configurar variáveis de ambiente
 
-# Editar com seus valores
-# Abrir .env e configurar:
-# - APP_BASE_URL (URL da aplicação)
-# - TEST_USERNAME (usuário de teste)
-# - TEST_PASSWORD (senha de teste)
+Crie o arquivo `.env` na raiz do projeto com as seguintes variáveis:
+
+```env
+# Aplicação
+APP_BASE_URL=https://sua-aplicacao.com
+TEST_USERNAME=usuario_de_teste
+TEST_PASSWORD=senha_de_teste
+
+# Navegador
+BROWSER=chromium          # chromium | firefox | webkit
+HEADLESS=true
+SLOW_MO=0                 # Atraso entre ações em milissegundos
+
+# Timeouts
+TIMEOUT=30000
+MAX_TIMEOUT=60000
+
+# Evidências
+SCREENSHOT_ON_FAILURE=true
+SCREENSHOT_ON_SUCCESS=false
+
+# Relatórios
+REPORT_DIR=./documents/reports
+GENERATE_HTML=true
 ```
 
-### 3. **Setup do Playwright** (Opcional)
+### 3. Instalar navegadores do Playwright (opcional)
 
 ```bash
 npm run setup
+```
 
-# Isso baixa os navegadores (Chromium, Firefox, WebKit)
+Por padrão, o Chromium já é instalado junto com o Playwright. Este passo baixa também Firefox e WebKit.
+
+---
+
+## Estrutura do Projeto
+
+```
+QAlfred/
+├── .github/
+│   ├── agents/
+│   │   └── QAlfred.agent.v2.md        Agente principal de execução
+│   └── skills/
+│       ├── test-case-designer.md      Gerador de cenários BDD
+│       ├── accessibility-tester.md    Auditor WCAG 2.1
+│       └── pdf-reporter.md            Gerador de relatórios
+├── documents/
+│   ├── gherkin/                       Arquivos .feature (entrada)
+│   ├── reports/                       Relatórios gerados (PDF/HTML)
+│   └── screenshots/                   Evidências de execução
+├── src/
+│   ├── runner.js                      Motor de execução de testes
+│   └── reporter.js                    Gerador de relatórios
+├── playwright.config.js
+├── package.json
+└── .env                               Variáveis de ambiente (não comitar)
 ```
 
 ---
 
-## 🎯 Executar Testes
+## Executando os Testes
 
-### **Executar Todos os Testes**
+### Todos os testes
 
 ```bash
 npm test
 ```
 
-### **Executar uma Feature Específica**
+### Feature específica
 
 ```bash
 npm test -- login
-
-# Ou com caminho completo:
-npm test -- documentos/gherkin/login.feature
+# ou com caminho completo
+npm test -- documents/gherkin/auth/login.feature
 ```
 
-### **Executar por Tag**
+### Por tag
 
 ```bash
-# Apenas testes críticos
-npm run test:critical
-
-# Apenas testes de smoke
-npm run test:smoke
-
-# Apenas testes de regressão
-npm run test:regression
+npm run test:smoke        # Validação rápida — executar a cada deploy
+npm run test:critical     # Fluxos críticos de negócio
+npm run test:regression   # Cobertura abrangente para releases
+npm run test:all          # Todos os testes sem filtro
 ```
 
-### **Executar Todos com Flag Explícito**
+### Selecionando o navegador em tempo de execução
 
 ```bash
-npm run test:all
+BROWSER=firefox npm test
+BROWSER=webkit npm test
 ```
 
 ---
 
-## 📊 Estrutura de Saída
+## Escrevendo Cenários
 
-```
-screenshots/
-├── login-Successful_login-2026-04-22T10-30-45.png
-├── login-Failed_login-2026-04-22T10-30-50-FAILED.png
-├── carrinho-Add_item-2026-04-22T10-31-00.png
-└── ...
-
-reports/
-├── test-report.json
-├── test-report.html
-└── summary.txt
-```
-
----
-
-## 🧪 Estrutura de Testes (Gherkin)
-
-### Exemplo: `documentos/gherkin/login.feature`
+Os arquivos `.feature` devem ser criados em `documents/gherkin/`. O runner suporta palavras-chave em português (`Dado`, `Quando`, `Então`, `E`) e em inglês (`Given`, `When`, `Then`, `And`).
 
 ```gherkin
-Feature: User Login
-  As a user
-  I want to log in securely
-  So that I can access my account
+Feature: Autenticação de usuário
 
   Background:
-    Given the login page is loaded
+    Dado que acesso a url "APP_BASE_URL/login"
 
   @critical @smoke
-  Scenario: Successful login with valid credentials
-    When the user enters valid username
-    And the user enters valid password
-    And clicks the login button
-    Then the dashboard should be displayed
+  Scenario: Login com credenciais válidas
+    Quando preencho o campo "Username" com "TEST_USERNAME"
+    E preencho o campo "Password" com "TEST_PASSWORD"
+    E clico no botão "Entrar"
+    Então sou redirecionado para "/dashboard"
 
   @regression
-  Scenario: Failed login with invalid credentials
-    When the user enters invalid username
-    And the user enters invalid password
-    And clicks the login button
-    Then an error message should be shown
+  Scenario: Login com credenciais inválidas
+    Quando preencho o campo "Username" com "usuario_invalido"
+    E preencho o campo "Password" com "senha_invalida"
+    E clico no botão "Entrar"
+    Então vejo a mensagem de erro "Credenciais inválidas"
 ```
+
+Valores em maiúsculas correspondentes a variáveis de ambiente (ex.: `TEST_USERNAME`) são substituídos automaticamente pelo runner em tempo de execução.
+
+### Tags disponíveis
+
+| Tag | Propósito |
+|-----|-----------|
+| `@smoke` | Sanidade básica — executada a cada deploy |
+| `@critical` | Fluxos críticos de negócio — bloqueia entrega se falhar |
+| `@regression` | Cobertura ampla para ciclos de release |
+| `@wip` | Em desenvolvimento — excluída por padrão |
+| `@acessibilidade` | Aciona auditoria WCAG 2.1 via `accessibility-tester` |
 
 ---
 
-## 🔌 Criar Novos Cenários
+## Agentes
 
-Use o **Test Case Designer** agent:
+O projeto utiliza três agentes especializados acessíveis via Claude Code:
 
-1. Abra VS Code
-2. Pressione `Ctrl+Shift+A` (Chat do Copilot)
-3. Digite: `@test-case-designer`
-4. Descreva a feature que precisa testar
+**Test Case Designer** — Gera arquivos `.feature` a partir de descrições funcionais em linguagem natural. Ao descrever um fluxo, o agente produz cenários BDD estruturados com cenários positivos, negativos e de borda.
 
-Exemplo:
-```
-Preciso testar o fluxo de checkout. Deve validar:
-- Adicionar produto ao carrinho
-- Preencher dados de entrega
-- Confirmar pagamento
-```
+**Accessibility Tester** — Executa auditoria de conformidade WCAG 2.1 em cenários marcados com `@acessibilidade`, verificando contraste, navegação por teclado, atributos ARIA e legibilidade.
 
-O Test Case Designer criará um arquivo `.feature` com cenários Gherkin prontos!
+**PDF Reporter** — Consolida os resultados de execução em relatório PDF (formato A4) com sumário de métricas, detalhamento de falhas e screenshots associadas.
 
 ---
 
-## 🛠️ Configuração Avançada
+## Relatórios
 
-### **Variáveis de Ambiente** (`.env`)
+Ao término de cada execução, os relatórios são gerados automaticamente em `documents/reports/`:
 
-```env
-# Browser Configuration
-BROWSER=chromium              # chromium | firefox | webkit
-HEADLESS=true                # Rodar em headless mode
-SLOW_MO=500                  # Desacelerar ações (ms)
-TIMEOUT=30000                # Timeout padrão (ms)
+- `Relatorio-{timestamp}.pdf` — Relatório imprimível com sumário visual
+- `Relatorio-{timestamp}.html` — Versão interativa para navegador
 
-# Screenshots
-SCREENSHOT_ON_FAILURE=true   # Capturar screenshot em falhas
-SCREENSHOT_ON_SUCCESS=false  # Capturar screenshot em sucessos
-SCREENSHOT_FORMAT=png        # png | jpeg
+O console exibe um sumário imediato com total de cenários, aprovados, reprovados e taxa de sucesso.
 
-# Reports
-REPORT_DIR=./reports         # Diretório de relatórios
-GENERATE_HTML=true           # Gerar relatório HTML
-```
-
-### **Browsers Suportados**
-
-```bash
-# Rodar com Firefox
-BROWSER=firefox npm test
-
-# Rodar com WebKit
-BROWSER=webkit npm test
-
-# Rodar com Chromium (padrão)
-BROWSER=chromium npm test
-```
+As evidências visuais são organizadas em `documents/screenshots/{timestamp}/{nome-do-cenario}/`.
 
 ---
 
-## 📈 Relatórios
+## Troubleshooting
 
-Após executar testes, os relatórios são gerados em:
-- `reports/test-report.json` — Detalhado (máquina-legível)
-- `reports/test-report.html` — Visual (browser)
-- Console output — Resumo rápido
+**`Cannot find module 'playwright'`**
+Execute `npm install` para restaurar as dependências.
 
+**Nenhum arquivo `.feature` encontrado**
+Verifique se existem arquivos `.feature` em `documents/gherkin/`. O diretório deve conter pelo menos um arquivo para o runner iniciar a execução.
+
+**Testes executando em modo visual (não headless)**
+Defina `HEADLESS=true` no arquivo `.env`.
+
+**Variáveis de ambiente não resolvidas nos passos**
+Confirme que o arquivo `.env` existe na raiz do projeto e que as variáveis estão escritas em maiúsculas no passo Gherkin.
 ---
 
-## 🐛 Troubleshooting
-
-### **Erro: "Cannot find module 'playwright'"**
-```bash
-npm install
-```
-
-### **Erro: "Cannot find .feature files"**
-Verifique se existem arquivos `.feature` em `documentos/gherkin/`:
-```bash
-ls documentos/gherkin/
-```
-
-### **Testes rodando em modo visual, não headless**
-No `.env`, defina:
-```env
-HEADLESS=true
-```
-
-### **Screenshots não estão sendo capturados**
-Verifique pasta `screenshots/` existe:
-```bash
-mkdir -p screenshots
-```
-
----
-
-## 📚 Estrutura do Projeto
-
-```
-QAlfred/
-├── .github/agents/
-│   ├── QAlfred.agent.md              (Agente executor)
-│   └── test-case-designer.agent.md   (Agente designer)
-├── documentos/gherkin/
-│   ├── login.feature
-│   ├── cadastro.feature
-│   ├── carrinho.feature
-│   ├── formulario.feature
-│   └── Pesquisa.feature
-├── src/
-│   └── runner.js                     (Main script)
-├── screenshots/                      (Relatórios visuais)
-├── reports/                          (Relatórios JSON/HTML)
-├── package.json                      (Dependências)
-├── .env.example                      (Variáveis de exemplo)
-├── .env                              (Variáveis (NÃO comitar))
-└── README.md                         (Este arquivo)
-```
-
----
-
-## 🔗 Integrações
-
-### **CI/CD Pipeline**
-
-Adicione isso em seu `.github/workflows/tests.yml`:
-
-```yaml
-name: QAlfred Tests
-
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - run: npm install
-      - run: npm test
-      - uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: screenshots
-          path: screenshots/
-```
-
----
-
-## 🚦 Status do Projeto
-
-| Componente | Status |
-|------------|--------|
-| Agentes de automação | ✅ Pronto |
-| Executor de testes | ✅ Pronto |
-| Gherkin parser | ✅ Pronto |
-| Playwright integration | ✅ Pronto |
-| Relatórios | 🟡 Beta |
-| CI/CD integration | 🟡 Beta |
-
----
-
-## 📞 Suporte
-
-Dúvidas or problemas?
-
-1. Verifique o console output
-2. Analise os screenshots em `screenshots/`
-3. Verifique `.env` está configurado
-4. Execute com `VERBOSE=true npm test` para debug
-
----
-
-## 📝 Licença
-
-MIT
-
----
-
-**Desenvolvido por**: QAlfred Team  
-**Última atualização**: 22 de Abril de 2026  
-**Versão**: 1.0.0
+Desenvolvido por Hebert Jesus
