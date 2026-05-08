@@ -1,8 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 import { chromium, firefox, webkit } from 'playwright';
-import { parse } from '@cucumber/gherkin';
-import { dialects } from '@cucumber/gherkin';
+import pkg from '@cucumber/gherkin';
+import { generateReport } from './reporter.js';
+const { Parser, AstBuilder, GherkinClassicTokenMatcher } = pkg;
+
+function parse(content) {
+  const builder = new AstBuilder(() => Math.random().toString(36).slice(2));
+  const matcher = new GherkinClassicTokenMatcher('pt');
+  const parser = new Parser(builder, matcher);
+  return parser.parse(content);
+}
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -14,7 +22,7 @@ const config = {
   headless: process.env.HEADLESS !== 'false',
   timeout: parseInt(process.env.TIMEOUT || '30000'),
   slowMo: parseInt(process.env.SLOW_MO || '0'),
-  screenshotDir: './screenshots',
+  screenshotDir: './documents/screenshots',
 };
 
 // Parse command line arguments
@@ -24,20 +32,31 @@ const tag = args.find(arg => arg.startsWith('--tag='))?.split('=')[1] || null;
 const runAll = args.includes('--all');
 
 /**
+ * Recursively collect all .feature files under a directory
+ */
+function collectFeatureFiles(dir) {
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  return entries.flatMap(entry => {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) return collectFeatureFiles(full);
+    if (entry.isFile() && entry.name.endsWith('.feature')) return [full];
+    return [];
+  });
+}
+
+/**
  * Main test runner
  */
 async function runTests() {
   console.log('\n🚀 QAlfred - E2E Test Runner');
   console.log('═'.repeat(50));
   
-  const gherkinDir = './documentos/gherkin';
-  
-  // Collect feature files
-  let featureFiles = fs.readdirSync(gherkinDir)
-    .filter(file => file.endsWith('.feature'))
-    .map(file => path.join(gherkinDir, file));
+  const gherkinDir = './documents/gherkin';
 
-  // Filter by feature name if specified
+  // Collect feature files recursively across app subfolders
+  let featureFiles = collectFeatureFiles(gherkinDir);
+
+  // Filter by feature name or app folder if specified
   if (feature && !runAll) {
     featureFiles = featureFiles.filter(f => f.includes(feature));
   }
@@ -49,22 +68,34 @@ async function runTests() {
 
   console.log(`📋 Found ${featureFiles.length} feature file(s)\n`);
 
+  const runTimestamp = new Date().toISOString()
+    .replace('T', '_').replace(/[:.]/g, '-').slice(0, 19);
+
   let browser;
   let totalStats = { passed: 0, failed: 0, blocked: 0 };
+  const runResults = { timestamp: runTimestamp, features: [], stats: totalStats };
 
   try {
-    // Launch browser
     browser = await launchBrowser(config.browser);
     console.log(`✅ Browser launched: ${config.browser}\n`);
 
-    // Execute each feature file
     for (const featureFile of featureFiles) {
       const featureName = path.basename(featureFile, '.feature');
-      await executeFeature(browser, featureFile, featureName, tag, totalStats);
+      // App name = name of the subfolder inside gherkin/
+      const appName = path.relative(gherkinDir, path.dirname(featureFile)).split(path.sep)[0] || 'general';
+      const featureResult = { name: featureName, app: appName, scenarios: [] };
+      runResults.features.push(featureResult);
+      await executeFeature(browser, featureFile, featureName, tag, totalStats, featureResult, runTimestamp);
     }
 
-    // Print summary
-    printTestSummary(totalStats);
+    const exitCode = printTestSummary(totalStats);
+
+    // Generate PDF report
+    console.log('📄 Generating PDF report...');
+    const pdfPath = await generateReport(browser, runResults, './documents/reports');
+    console.log(`✅ Report saved: ${pdfPath}\n`);
+
+    if (exitCode !== 0) process.exitCode = exitCode;
 
   } catch (error) {
     console.error('❌ Test execution failed:', error.message);
@@ -91,21 +122,31 @@ async function launchBrowser(browserName) {
       return await firefox.launch(options);
     case 'webkit':
       return await webkit.launch(options);
+    case 'edge':
+      return await chromium.launch({ ...options, channel: 'msedge' });
     default:
-      return await chromium.launch(options);
+      return await chromium.launch({ ...options, channel: 'chrome' });
   }
 }
 
 /**
  * Execute a single feature file
  */
-async function executeFeature(browser, featureFile, featureName, tagFilter, stats) {
+async function executeFeature(browser, featureFile, featureName, tagFilter, stats, featureResult, runTimestamp) {
   const content = fs.readFileSync(featureFile, 'utf-8');
   const gherkinDocument = parse(content);
-  const page = await browser.newPage();
 
-  console.log(`\n📄 Feature: ${featureName}`);
+  const appLabel = featureResult?.app ? ` [${featureResult.app}]` : '';
+  console.log(`\n📄 Feature: ${featureName}${appLabel}`);
   console.log('─'.repeat(50));
+
+  // Extract background steps
+  const backgroundSteps = [];
+  for (const child of gherkinDocument.feature.children) {
+    if (child.background) {
+      backgroundSteps.push(...child.background.steps);
+    }
+  }
 
   let scenariosPassed = 0;
   let scenariosFailed = 0;
@@ -113,149 +154,331 @@ async function executeFeature(browser, featureFile, featureName, tagFilter, stat
 
   try {
     for (const child of gherkinDocument.feature.children) {
-      if (child.scenario) {
-        const scenario = child.scenario;
-        
-        // Check if scenario has requested tag
-        if (tagFilter) {
-          const scenarioTags = scenario.tags?.map(t => t.name) || [];
-          if (!scenarioTags.includes(`@${tagFilter}`)) {
-            continue;
-          }
-        }
+      if (!child.scenario) continue;
+      const scenario = child.scenario;
 
-        const result = await executeScenario(page, scenario, featureName);
-        
-        if (result === 'passed') {
-          scenariosPassed++;
-          stats.passed++;
-          console.log(`  ✅ ${scenario.name}`);
-        } else if (result === 'failed') {
-          scenariosFailed++;
-          stats.failed++;
-          console.log(`  ❌ ${scenario.name}`);
-        } else if (result === 'blocked') {
-          scenariosBlocked++;
-          stats.blocked++;
-          console.log(`  ⚠️  ${scenario.name} (Blocked)`);
-        }
+      if (tagFilter) {
+        const scenarioTags = scenario.tags?.map(t => t.name) || [];
+        if (!scenarioTags.includes(`@${tagFilter}`)) continue;
+      }
+
+      const page = await browser.newPage();
+      const { status, steps, duration } = await executeScenario(page, scenario, featureName, backgroundSteps, runTimestamp);
+      await page.close();
+
+      featureResult.scenarios.push({ name: scenario.name, status, steps, duration });
+
+      if (status === 'passed') {
+        scenariosPassed++;
+        stats.passed++;
+        console.log(`  ✅ ${scenario.name}`);
+      } else if (status === 'failed') {
+        scenariosFailed++;
+        stats.failed++;
+        console.log(`  ❌ ${scenario.name}`);
+      } else {
+        scenariosBlocked++;
+        stats.blocked++;
+        console.log(`  ⚠️  ${scenario.name} (blocked)`);
       }
     }
   } catch (error) {
-    console.error(`  ❌ Feature execution error: ${error.message}`);
-  } finally {
-    await page.close();
+    console.error(`  ❌ Feature error: ${error.message}`);
   }
 
-  console.log(`\nResults: ${scenariosPassed} ✅ | ${scenariosFailed} ❌ | ${scenariosBlocked} ⚠️`);
+  console.log(`\nResults: ${scenariosPassed} passed | ${scenariosFailed} failed | ${scenariosBlocked} blocked`);
 }
 
 /**
- * Execute a single scenario
+ * Sanitize a string for use as a directory/file name
  */
-async function executeScenario(page, scenario, featureName) {
-  let status = 'passed';
+function sanitizeName(name) {
+  return name
+    .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+    .replace(/[^a-zA-Z0-9_\- ]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 80);
+}
 
-  for (const step of scenario.steps) {
+/**
+ * Execute a single scenario (background steps run first)
+ */
+async function executeScenario(page, scenario, featureName, backgroundSteps = [], runTimestamp) {
+  let status = 'passed';
+  const allSteps = [...backgroundSteps, ...scenario.steps];
+  const stepResults = [];
+
+  // screenshots/<run_timestamp>/<scenario>/
+  const scenarioDir = path.join(
+    config.screenshotDir,
+    runTimestamp,
+    sanitizeName(scenario.name)
+  );
+  fs.mkdirSync(scenarioDir, { recursive: true });
+
+  const startTime = Date.now();
+  let stepIndex = 0;
+
+  for (const step of allSteps) {
     const stepText = step.text;
     const keyword = step.keyword.trim();
+    stepIndex++;
 
     try {
       await executeStep(page, keyword, stepText, featureName, scenario.name);
-      
-      // Capture screenshot on success
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const screenshotPath = path.join(
-        config.screenshotDir,
-        `${featureName}-${scenario.name.replace(/\s+/g, '_')}-${timestamp}.png`
-      );
-      
+      stepResults.push({ keyword, text: stepText, status: 'passed', error: null });
+
       if (process.env.SCREENSHOT_ON_SUCCESS === 'true') {
-        await page.screenshot({ path: screenshotPath });
+        const stepName = sanitizeName(`${String(stepIndex).padStart(2, '0')}_${keyword}_${stepText}`);
+        await page.screenshot({ path: path.join(scenarioDir, `${stepName}.png`) });
       }
 
     } catch (error) {
       status = 'failed';
-      console.error(`    ❌ Step failed: ${stepText}`);
-      console.error(`    Error: ${error.message}`);
-
-      // Capture screenshot on failure
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const screenshotPath = path.join(
-        config.screenshotDir,
-        `${featureName}-${scenario.name.replace(/\s+/g, '_')}-FAILED-${timestamp}.png`
-      );
+      stepResults.push({ keyword, text: stepText, status: 'failed', error: error.message });
+      console.error(`    ❌ Step failed: "${stepText}"`);
+      console.error(`       Error: ${error.message}`);
 
       if (process.env.SCREENSHOT_ON_FAILURE !== 'false') {
         try {
-          await page.screenshot({ path: screenshotPath });
+          const stepName = sanitizeName(`${String(stepIndex).padStart(2, '0')}_FAILED_${keyword}_${stepText}`);
+          await page.screenshot({ path: path.join(scenarioDir, `${stepName}.png`) });
         } catch (screenshotError) {
-          console.error(`    Could not capture screenshot: ${screenshotError.message}`);
+          console.error(`       Could not capture screenshot: ${screenshotError.message}`);
         }
       }
 
-      break; // Stop executing remaining steps in this scenario
+      // Mark remaining steps as skipped
+      for (const remaining of allSteps.slice(stepIndex)) {
+        stepResults.push({ keyword: remaining.keyword.trim(), text: remaining.text, status: 'skipped', error: null });
+      }
+      break;
     }
   }
 
-  return status;
+  const duration = Date.now() - startTime;
+  console.log(`     📁 Folder: ${path.relative('.', scenarioDir)}`);
+  return { status, steps: stepResults, duration };
+}
+
+/**
+ * Resolve a value: if it matches an env var name, return its value; otherwise return as-is.
+ */
+function resolveEnvValue(value) {
+  if (value && /^[A-Z][A-Z0-9_]+$/.test(value) && process.env[value] !== undefined) {
+    return process.env[value];
+  }
+  return value;
 }
 
 /**
  * Execute a single step
  */
 async function executeStep(page, keyword, stepText, feature, scenario) {
-  // Example implementations for common Gherkin keywords
-  
-  if (keyword === 'Given') {
+  const kw = keyword.trim();
+
+  // ── Portuguese: Dado / Dado que ──────────────────────────────────────────
+  if (kw === 'Dado' || kw === 'Dado que') {
+    if (stepText.match(/acesso a url/i)) {
+      const urlKey = extractQuotedValue(stepText);
+      const url = resolveEnvValue(urlKey);
+      await page.goto(url);
+      await page.waitForLoadState('networkidle');
+      return;
+    }
+  }
+
+  // ── Portuguese: Quando / E (shared action steps) ─────────────────────────
+  if (kw === 'Quando' || kw === 'E') {
+    // preencho o campo "X" com "Y"
+    if (stepText.match(/preencho o campo/i)) {
+      const fieldId = extractQuotedValue(stepText, 0);
+      const rawValue = extractQuotedValue(stepText, 1);
+      const value = resolveEnvValue(rawValue);
+      await page.fill(buildInputSelector(fieldId), value);
+      return;
+    }
+    // deixo o campo "X" em branco
+    if (stepText.match(/deixo o campo.+em branco/i)) {
+      const fieldId = extractQuotedValue(stepText);
+      await page.fill(buildInputSelector(fieldId), '');
+      return;
+    }
+    // clico no botão "X"
+    if (stepText.match(/clico no bot[aã]o/i)) {
+      const label = extractQuotedValue(stepText);
+      await page.click(`button:has-text("${label}"), input[type="submit"][value="${label}"], input[value="${label}"]`);
+      await page.waitForLoadState('networkidle');
+      return;
+    }
+    // clico no link "X"
+    if (stepText.match(/clico no link/i)) {
+      const label = extractQuotedValue(stepText);
+      await page.click(`a:has-text("${label}"), button:has-text("${label}")`);
+      await page.waitForLoadState('networkidle');
+      return;
+    }
+    // legado: insiro um nome de usuário "X" no campo "Y"
+    if (stepText.match(/insiro um nome de usu[aá]rio/i)) {
+      const value = extractQuotedValue(stepText);
+      const field = extractQuotedValue(stepText, 1);
+      await page.fill(buildInputSelector(field || 'Username'), value);
+      return;
+    }
+    // legado: senha "X"
+    if (stepText.match(/^senha\s+"([^"]+)"$/i)) {
+      const password = extractQuotedValue(stepText);
+      await page.fill(buildInputSelector('Password'), password);
+      return;
+    }
+    // legado: clicar no botão "X"
+    if (stepText.match(/clicar no bot[aã]o/i)) {
+      const label = extractQuotedValue(stepText);
+      await page.click(`input[type="submit"][value="${label}"], button:has-text("${label}"), input[value="${label}"]`);
+      await page.waitForLoadState('networkidle');
+      return;
+    }
+  }
+
+  // ── Portuguese: Então / E (shared assertion steps) ───────────────────────
+  if (kw === 'Então' || kw === 'Entao' || kw === 'E') {
+    // sou redirecionado para "/path"
+    if (stepText.match(/sou redirecionado para/i)) {
+      const expectedPath = extractQuotedValue(stepText);
+      await page.waitForURL(`**${expectedPath}**`, { timeout: 8000 });
+      return;
+    }
+    // permaneço na página de login
+    if (stepText.match(/perma(ne[cç]o|nece) na p[aá]gina de login/i)) {
+      await page.waitForLoadState('networkidle');
+      const url = page.url();
+      if (!url.includes('login')) {
+        throw new Error(`Expected to remain on login page, got "${url}"`);
+      }
+      return;
+    }
+    // vejo a mensagem de erro "X"
+    if (stepText.match(/vejo a mensagem de erro/i)) {
+      const text = extractQuotedValue(stepText);
+      await page.waitForSelector(
+        '[role=alert], .alert, .invalid-feedback, [class*="alert"]',
+        { timeout: 5000 }
+      ).catch(() => {});
+      const alerts = await page.evaluate(() =>
+        [...document.querySelectorAll('[role=alert], .alert, .invalid-feedback, [class*="alert"], span[class*="feedback"]')]
+          .map(el => el.innerText.trim()).filter(Boolean).join(' | ')
+      );
+      if (!alerts.includes(text)) {
+        throw new Error(`Expected error message "${text}", found: "${alerts || '(nenhum alerta)'}"`);
+      }
+      return;
+    }
+    // vejo o texto "X"
+    if (stepText.match(/vejo o texto/i)) {
+      const text = extractQuotedValue(stepText);
+      await page.waitForSelector(`text=${text}`, { timeout: 5000 });
+      const isVisible = await page.isVisible(`text=${text}`);
+      if (!isVisible) throw new Error(`Text "${text}" not visible`);
+      return;
+    }
+    // legado: redirecionado para a página inicial
+    if (stepText.match(/redirecionado para a p[aá]gina inicial/i)) {
+      await page.waitForFunction(
+        () => !window.location.href.includes('login'),
+        { timeout: 8000 }
+      );
+      return;
+    }
+    // legado: should see
+    if (stepText.includes('should see')) {
+      const text = extractQuotedValue(stepText) || extractElementName(stepText);
+      await page.waitForSelector(`text=${text}`);
+      const isVisible = await page.isVisible(`text=${text}`);
+      if (!isVisible) throw new Error(`Element "${text}" not visible`);
+      return;
+    }
+  }
+
+  // ── English: Given ───────────────────────────────────────────────────────
+  if (kw === 'Given') {
     if (stepText.includes('page is loaded')) {
       await page.goto(config.baseURL);
       await page.waitForLoadState('networkidle');
-    } else if (stepText.includes('user is not authenticated')) {
-      await page.context().clearCookies();
+      return;
     }
-  } 
-  
-  else if (keyword === 'When') {
+    if (stepText.includes('user is not authenticated')) {
+      await page.context().clearCookies();
+      return;
+    }
+  }
+
+  // ── English: When ────────────────────────────────────────────────────────
+  if (kw === 'When') {
     if (stepText.includes('clicks on')) {
       const elementName = extractElementName(stepText);
       await page.click(`text=${elementName}`);
-    } else if (stepText.includes('enters')) {
+      return;
+    }
+    if (stepText.includes('enters')) {
       const parts = stepText.match(/enters (.+) in (.+)/);
       if (parts) {
-        const value = parts[1];
-        const fieldName = parts[2];
-        const selector = `input[placeholder*="${fieldName}"], input[name*="${fieldName}"]`;
-        await page.fill(selector, value);
+        const selector = `input[placeholder*="${parts[2]}"], input[name*="${parts[2]}"]`;
+        await page.fill(selector, parts[1]);
+        return;
       }
-    } else if (stepText.includes('submits')) {
-      await page.click('button[type="submit"], button:has-text("Submit")');
     }
-  } 
-  
-  else if (keyword === 'Then') {
+    if (stepText.includes('submits')) {
+      await page.click('button[type="submit"], button:has-text("Submit")');
+      return;
+    }
+  }
+
+  // ── English: Then ────────────────────────────────────────────────────────
+  if (kw === 'Then') {
     if (stepText.includes('should see')) {
       const text = extractElementName(stepText);
       await page.waitForSelector(`text=${text}`);
       const isVisible = await page.isVisible(`text=${text}`);
       if (!isVisible) throw new Error(`Element "${text}" not visible`);
-    } else if (stepText.includes('should not see')) {
+      return;
+    }
+    if (stepText.includes('should not see')) {
       const text = extractElementName(stepText);
       const isVisible = await page.isVisible(`text=${text}`).catch(() => false);
       if (isVisible) throw new Error(`Element "${text}" is visible but should not be`);
-    } else if (stepText.includes('URL should be')) {
+      return;
+    }
+    if (stepText.includes('URL should be')) {
       const expectedUrl = stepText.match(/URL should be (.+)/)[1];
       const currentUrl = page.url();
       if (!currentUrl.includes(expectedUrl)) {
         throw new Error(`Expected URL to include "${expectedUrl}", but got "${currentUrl}"`);
       }
+      return;
     }
-  } 
-  
-  else if (keyword === 'And') {
-    // And steps are treated as their preceding type (Given/When/Then)
-    await executeStep(page, 'When', stepText, feature, scenario);
   }
+
+  console.warn(`    ⚠️  No handler for [${kw}] "${stepText}"`);
+}
+
+/**
+ * Helper: extract nth quoted value from step text (0-based index)
+ */
+function extractQuotedValue(stepText, index = 0) {
+  const matches = [...stepText.matchAll(/"([^"]+)"/g)];
+  return matches[index]?.[1] || null;
+}
+
+/**
+ * Helper: build input selector by placeholder, name, or id
+ */
+function buildInputSelector(fieldName) {
+  return [
+    `input[placeholder*="${fieldName}" i]`,
+    `input[name*="${fieldName}" i]`,
+    `input[id*="${fieldName}" i]`,
+  ].join(', ');
 }
 
 /**
@@ -276,16 +499,14 @@ function printTestSummary(stats) {
   console.log('\n' + '═'.repeat(50));
   console.log('📊 TEST SUMMARY');
   console.log('═'.repeat(50));
-  console.log(`Total Tests:  ${total}`);
-  console.log(`✅ Passed:     ${stats.passed}`);
-  console.log(`❌ Failed:     ${stats.failed}`);
-  console.log(`⚠️  Blocked:    ${stats.blocked}`);
-  console.log(`📈 Pass Rate:  ${passRate}%`);
+  console.log(`Total:        ${total}`);
+  console.log(`✅ Passed:    ${stats.passed}`);
+  console.log(`❌ Failed:    ${stats.failed}`);
+  console.log(`⚠️  Blocked:   ${stats.blocked}`);
+  console.log(`📈 Pass Rate: ${passRate}%`);
   console.log('═'.repeat(50) + '\n');
 
-  if (stats.failed > 0) {
-    process.exit(1);
-  }
+  return stats.failed > 0 ? 1 : 0;
 }
 
 // Run tests

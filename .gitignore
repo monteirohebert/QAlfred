@@ -17,7 +17,9 @@ yarn.lock
 .DS_Store
 
 # Test outputs
-screenshots/
+documents/screenshots/
+documents/reports/
+documents/gherkin/
 reports/
 *.log
 
@@ -34,5 +36,3 @@ build/
 .DS_Store
 Thumbs.db
 
-#Arquivos
-screenshots/
